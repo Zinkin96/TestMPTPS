@@ -4,6 +4,8 @@
 #include "Items/PickUp.h"
 #include "TestMPTPSCharacter.h"
 #include "Items/Weapons/Weapon_Base_Ranged.h"
+#include <Net/UnrealNetwork.h>
+
 
 // Sets default values
 APickUp::APickUp()
@@ -11,16 +13,27 @@ APickUp::APickUp()
 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = false;
 	// Set Replication
-	SetReplicates(true);
+	bReplicates = true;
 
 	PrimaryActorTick.bStartWithTickEnabled = false;
 	PrimaryActorTick.bCanEverTick = false;
 	RootComponent = ItemMesh;
 	ItemMesh->SetStaticMesh(NULL);
-	ItemMesh->SetSimulatePhysics(true);
+	//ItemMesh->SetSimulatePhysics(true);
 	ItemMesh->SetUseCCD(true);
 	ItemMesh->BodyInstance.SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	ItemMesh->BodyInstance.SetResponseToAllChannels(ECollisionResponse::ECR_Block);
+}
+
+APickUp::~APickUp()
+{
+	OnDestroyed.RemoveAll(this);
+}
+
+void APickUp::GetLifetimeReplicatedProps(TArray< FLifetimeProperty >& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(APickUp, Item);
 }
 
 // Called when the game starts or when spawned
@@ -53,10 +66,14 @@ void APickUp::ConstructPickupMesh()
 
 void APickUp::InteractionEvent_Implementation(AActor* InteractionCaller)
 {
+	if (!IsValid(Item->Class))
+	{
+		return;
+	}
 	TSubclassOf<AWeapon_Base_Ranged> WeaponToEquip { Item->Class };
 	if (ATestMPTPSCharacter* CharacterReference = Cast<ATestMPTPSCharacter>(InteractionCaller))
 	{
-		CharacterReference->EquipWeapon(WeaponToEquip);
+		CharacterReference->EquipWeapon(WeaponToEquip, this);
 	}
 	Destroy();
 	return;

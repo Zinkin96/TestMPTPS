@@ -13,6 +13,11 @@ void AWeapon_Base_Ranged::BeginPlay()
 	Super::BeginPlay();
 }
 
+AWeapon_Base_Ranged::~AWeapon_Base_Ranged()
+{
+	OnAmmoCountChanged.RemoveAll(this);
+}
+
 void AWeapon_Base_Ranged::BeginAttack()
 {
 	bWantsToAttack = true;
@@ -39,12 +44,18 @@ void AWeapon_Base_Ranged::AttackHandle_Implementation()
 		{
 			FVector StartLocation = WeaponMesh->GetSocketLocation("MuzzleFlash");
 
-			FRotator ResultRotation = UKismetMathLibrary::FindLookAtRotation(StartLocation, IInteractable::Execute_TargetResult_Location(GetOwner())) + FRotator(UKismetMathLibrary::RandomFloatInRange(WeaponStats.AttackSpread / 2 * -1, WeaponStats.AttackSpread / 2), UKismetMathLibrary::RandomFloatInRange(WeaponStats.AttackSpread / 2 * -1, WeaponStats.AttackSpread / 2), 0);
+			TArray<FRotator> ResultRotations;
+			for (int32 ProjectileIndex = 0; ProjectileIndex < WeaponAmmoStats.ProjectileNum; ProjectileIndex++)
+			{
+				FRotator ResultRotation = UKismetMathLibrary::FindLookAtRotation(StartLocation, IInteractable::Execute_TargetResult_Location(GetOwner())) + FRotator(UKismetMathLibrary::RandomFloatInRange(WeaponStats.AttackSpread / 2 * -1, WeaponStats.AttackSpread / 2), UKismetMathLibrary::RandomFloatInRange(WeaponStats.AttackSpread / 2 * -1, WeaponStats.AttackSpread / 2), 0);
+				ResultRotations.Add(ResultRotation);
+			}
 			UGameplayStatics::SpawnEmitterAttached(MuzzleParticle, RootComponent, "MuzzleFlash");
 
 			WeaponAmmoStats.CurrentAmmo = FMath::Max(0, WeaponAmmoStats.CurrentAmmo-1);
-			SpawnProjectile(StartLocation, ResultRotation);
-			ServerWeaponAttack(StartLocation, ResultRotation);
+			OnAmmoCountChanged.Broadcast();
+			SpawnProjectile(StartLocation, ResultRotations);
+			ServerWeaponAttack(StartLocation, ResultRotations);
 		}
 
 		GetWorldTimerManager().SetTimer(AttackTimer, this, &AWeapon_Base_Ranged::AttackHandle, WeaponStats.AttackRate, false);
@@ -61,29 +72,33 @@ bool AWeapon_Base_Ranged::IsAttackPossible()
 	return true;
 }
 
-void AWeapon_Base_Ranged::ServerWeaponAttack_Implementation(FVector Location, FRotator Rotation)
+void AWeapon_Base_Ranged::ServerWeaponAttack_Implementation(FVector Location, const TArray<FRotator> &Rotations)
 {
-	MulticastWeaponAttack(Location, Rotation);
+	MulticastWeaponAttack(Location, Rotations);
 }
 
-void AWeapon_Base_Ranged::MulticastWeaponAttack_Implementation(FVector Location, FRotator Rotation)
+void AWeapon_Base_Ranged::MulticastWeaponAttack_Implementation(FVector Location, const TArray<FRotator>& Rotations)
 {
 	if (!GetInstigator()->IsLocallyControlled() && !(GetInstigator()->HasAuthority()))
 	{
-		SpawnProjectile(Location, Rotation);
+		SpawnProjectile(Location, Rotations);
 	}
 }
 
-void AWeapon_Base_Ranged::SpawnProjectile(FVector Location, FRotator Rotation)
+void AWeapon_Base_Ranged::SpawnProjectile(FVector Location, const TArray<FRotator>& Rotations)
 {
 	UGameplayStatics::SpawnEmitterAttached(MuzzleParticle, RootComponent, "MuzzleFlash");
 	FActorSpawnParameters SpawnParameters;
 	SpawnParameters.Owner = GetOwner();
 	SpawnParameters.Instigator = GetInstigator();
-	GetWorld()->SpawnActor<AProjectile_Base>(ProjectileClass, Location, Rotation, SpawnParameters);
+	for (FRotator Rotation : Rotations)
+	{
+		GetWorld()->SpawnActor<AProjectile_Base>(ProjectileClass, Location, Rotation, SpawnParameters);
+	}
 }
 
 void AWeapon_Base_Ranged::RefillMagazine()
 {
 	WeaponAmmoStats.CurrentAmmo = WeaponAmmoStats.MaxAmmo;
+	OnAmmoCountChanged.Broadcast();
 }

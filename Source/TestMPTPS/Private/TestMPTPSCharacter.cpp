@@ -14,6 +14,9 @@
 #include "Interfaces/Interactable.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "TestMPTPSPlayerController.h"
+#include "TestMPTPSGameState.h"
+#include "Kismet/GameplayStatics.h"
+#include "TestMPTPSHUD.h"
 #include <Net/UnrealNetwork.h>
 
 //////////////////////////////////////////////////////////////////////////
@@ -58,6 +61,12 @@ ATestMPTPSCharacter::ATestMPTPSCharacter()
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
 	GetMesh()->SetCollisionProfileName("Ragdoll", true);
 	GetMesh()->SetCollisionResponseToChannel(ECollisionChannel::ECC_Visibility, ECollisionResponse::ECR_Block);
+}
+
+ATestMPTPSCharacter::~ATestMPTPSCharacter()
+{
+	OnHealthChanged.RemoveAll(this);
+	OnWeaponChanged.RemoveAll(this);
 }
 
 void ATestMPTPSCharacter::ServerSetAimOffset_Implementation(float Offset_Y, float Offset_Z)
@@ -115,7 +124,7 @@ void ATestMPTPSCharacter::RecalculateHealth()
 	{
 		if (IsLocallyControlled())
 		{
-			if (TObjectPtr<ATestMPTPSPlayerController> PlayerController = Cast<ATestMPTPSPlayerController>(GetController()))
+			if (IsValid(PlayerController))
 			{
 				DisableInput(PlayerController);
 				EndAttack();
@@ -127,11 +136,22 @@ void ATestMPTPSCharacter::RecalculateHealth()
 	}
 }
 
-void ATestMPTPSCharacter::ApplyDamage(float Damage)
+void ATestMPTPSCharacter::WeaponChanged()
+{
+	OnWeaponChanged.Broadcast();
+}
+
+void ATestMPTPSCharacter::ApplyDamage(float Damage, ACharacter* DamageOwner)
 {
 	if (HasAuthority())
 	{
 		CharacterStats.CurrentHealth = UKismetMathLibrary::Max(0.0f, CharacterStats.CurrentHealth - Damage);
+		if ((CharacterStats.CurrentHealth <= 0.0f) && GameState && bDead == false)
+		{
+			bDead = true;
+			GameState->IncreaseKillCount(DamageOwner->GetPlayerState());
+			GameState->IncreaseDeathCount(this->GetPlayerState());
+		}
 	}
 }
 
@@ -139,9 +159,14 @@ void ATestMPTPSCharacter::BeginPlay()
 {
 	// Call the base class  
 	Super::BeginPlay();
-
+	GameState = Cast<ATestMPTPSGameState>(GetWorld()->GetGameState());
+	PlayerController = Cast<ATestMPTPSPlayerController>(GetController());
+	if (IsValid(PlayerController))
+	{
+		GameHUD = Cast<ATestMPTPSHUD>(PlayerController->GetHUD());
+	}
 	//Add Input Mapping Context
-	if (APlayerController* PlayerController = Cast<APlayerController>(Controller))
+	if (IsValid(PlayerController))
 	{
 		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PlayerController->GetLocalPlayer()))
 		{
@@ -153,18 +178,23 @@ void ATestMPTPSCharacter::BeginPlay()
 	EquipWeapon(StartWeapon);
 }
 
-void ATestMPTPSCharacter::EquipWeapon(TSubclassOf<AWeapon_Base_Ranged> WeaponClass)
+void ATestMPTPSCharacter::EquipWeapon(TSubclassOf<AWeapon_Base_Ranged> WeaponClass, AActor* PickUpActor)
 {
 	if (IsValid(WeaponClass))
 	{
-		ServerEquipWeapon(WeaponClass);
+		ServerEquipWeapon(WeaponClass, PickUpActor);
 	}
 }
 
-void ATestMPTPSCharacter::ServerEquipWeapon_Implementation(TSubclassOf<AWeapon_Base_Ranged> WeaponClass)
+void ATestMPTPSCharacter::ServerEquipWeapon_Implementation(TSubclassOf<AWeapon_Base_Ranged> WeaponClass, AActor* PickUpActor)
 {
+	if (IsValid(PickUpActor))
+	{
+		PickUpActor->Destroy();
+	}
 	if (IsValid(WeaponRef))
 	{
+		EndAttack();
 		WeaponRef->Destroy(true);
 	}
 	FActorSpawnParameters SpawnParameters;
@@ -201,6 +231,14 @@ void ATestMPTPSCharacter::SetupPlayerInputComponent(class UInputComponent* Playe
 
 		//Reload
 		EnhancedInputComponent->BindAction(ReloadAction, ETriggerEvent::Triggered, this, &ATestMPTPSCharacter::Reload);
+
+		//Aiming
+		EnhancedInputComponent->BindAction(AimAction, ETriggerEvent::Started, this, &ATestMPTPSCharacter::BeginAim);
+		EnhancedInputComponent->BindAction(AimAction, ETriggerEvent::Completed, this, &ATestMPTPSCharacter::EndAim);
+
+		//Scoreboard
+		EnhancedInputComponent->BindAction(ScoreboardAction, ETriggerEvent::Started, this, &ATestMPTPSCharacter::OpenScoreboard);
+		EnhancedInputComponent->BindAction(ScoreboardAction, ETriggerEvent::Completed, this, &ATestMPTPSCharacter::CloseScoreboard);
 	}
 
 }
@@ -244,7 +282,10 @@ void ATestMPTPSCharacter::Look(const FInputActionValue& Value)
 void ATestMPTPSCharacter::Interact(const FInputActionValue& Value)
 {
 	TObjectPtr<AActor> InteractableActor = IInteractable::Execute_TargetResult_Actor(GetController());
-	IInteractable::Execute_InteractionEvent(InteractableActor, this);
+	if (IsValid(InteractableActor) && Cast<IInteractable>(InteractableActor))
+	{
+		IInteractable::Execute_InteractionEvent(InteractableActor, this);
+	}
 }
 
 void ATestMPTPSCharacter::BeginAttack()
@@ -280,8 +321,57 @@ void ATestMPTPSCharacter::Reload()
 	}
 	PlayReloadAnimation();
 	EndAttack();
+	EndAim();
 	GetWorldTimerManager().SetTimer(ReloadTimer, WeaponRef.Get(), &AWeapon_Base_Ranged::RefillMagazine, WeaponRef->GetAmmoStats().ReloadSpeed, false);
 	ServerReload();
+}
+
+void ATestMPTPSCharacter::BeginAim()
+{
+	if (!IsValid(WeaponRef))
+	{
+		return;
+	}
+	if (GetMesh()->GetAnimInstance()->GetActiveInstanceForMontage(WeaponRef->GetReloadMontage()))
+	{
+		return;
+	}
+	if (GetWorldTimerManager().GetTimerRemaining(ReloadTimer) > 0.0f)
+	{
+		return;
+	}
+	bAiming = true;
+	if (IsValid(PlayerController))
+	{
+		PlayerController->PlayerCameraManager->SetFOV(75.0f);
+	}
+	ServerSetAim(true);
+}
+
+void ATestMPTPSCharacter::EndAim()
+{
+	bAiming = false;
+	if (IsValid(PlayerController))
+	{
+		PlayerController->PlayerCameraManager->SetFOV(90.0f);
+	}
+	ServerSetAim(false);
+}
+
+void ATestMPTPSCharacter::OpenScoreboard()
+{
+	if (IsValid(GameHUD))
+	{
+		GameHUD->GetMainWidget()->ShowScoreboard(true);
+	}
+}
+
+void ATestMPTPSCharacter::CloseScoreboard()
+{
+	if (IsValid(GameHUD))
+	{
+		GameHUD->GetMainWidget()->ShowScoreboard(false);
+	}
 }
 
 FRotator ATestMPTPSCharacter::CalculateLookAtRotation(const FRotator AimOffsetCurrent, const float InterpTime, const float InterpSpeed)
@@ -323,7 +413,7 @@ void ATestMPTPSCharacter::ServerHitCheck_Implementation(FVector HitLocation, AAc
 	}
 	if (ATestMPTPSCharacter* HittedCharacter = Cast<ATestMPTPSCharacter>(HitActor))
 	{
-		HittedCharacter->ApplyDamage(WeaponRef->GetStats().Damage);
+		HittedCharacter->ApplyDamage(WeaponRef->GetStats().Damage, this);
 	}
 }
 
@@ -340,8 +430,20 @@ void ATestMPTPSCharacter::MulticastReload_Implementation()
 	}
 }
 
-
 void ATestMPTPSCharacter::PlayReloadAnimation()
 {
 	GetMesh()->GetAnimInstance()->Montage_Play(WeaponRef->GetReloadMontage(), WeaponRef->GetReloadMontage()->GetPlayLength() / WeaponRef->GetAmmoStats().ReloadSpeed);
+}
+
+void ATestMPTPSCharacter::ServerSetAim_Implementation(bool Aiming)
+{
+	MulticastSetAim(Aiming);
+}
+
+void ATestMPTPSCharacter::MulticastSetAim_Implementation(bool Aiming)
+{
+	if (!IsLocallyControlled() && !HasAuthority())
+	{
+		bAiming = Aiming;
+	}
 }

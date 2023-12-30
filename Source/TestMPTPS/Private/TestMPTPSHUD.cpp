@@ -6,7 +6,7 @@
 
 ATestMPTPSHUD::ATestMPTPSHUD()
 {
-	static ConstructorHelpers::FClassFinder<UUserWidget> MainWidgetUIHelper(TEXT("/Game/UI/WBP_MainUI"));
+	static ConstructorHelpers::FClassFinder<UMainUI_Base> MainWidgetUIHelper(TEXT("/Game/UI/WBP_MainUI"));
 	if (IsValid(MainWidgetUIHelper.Class))
 	{
 		MainWidgetUIClass = MainWidgetUIHelper.Class;
@@ -17,7 +17,7 @@ void ATestMPTPSHUD::BeginPlay()
 {
 	if (IsValid(MainWidgetUIClass))
 	{
-		MainWidgetUI = CreateWidget<UUserWidget>(GetGameInstance(), MainWidgetUIClass);
+		MainWidgetUI = CreateWidget<UMainUI_Base>(GetGameInstance(), MainWidgetUIClass);
 		MainWidgetUI->AddToViewport();
 	}
 }

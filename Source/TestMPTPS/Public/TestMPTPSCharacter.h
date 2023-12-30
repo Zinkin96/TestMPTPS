@@ -11,6 +11,8 @@
 
 UDELEGATE()
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnHealthChangedDelegate);
+UDELEGATE()
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnWeaponChangedDelegate);
 
 USTRUCT(BlueprintType, Blueprintable)
 struct FCharacterStats
@@ -65,20 +67,33 @@ class TESTMPTPS_API ATestMPTPSCharacter : public ACharacter, public IDamageable
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 		class UInputAction* ReloadAction;
 
+	/** Aim Input Action */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+		class UInputAction* AimAction;
+
+	/** Scoreboard Input Action */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+		class UInputAction* ScoreboardAction;
+
 public:
 	ATestMPTPSCharacter();
+
+	~ATestMPTPSCharacter();
 
 	UFUNCTION(BlueprintCallable)
 		virtual FRotator CalculateLookAtRotation(const FRotator AimOffsetCurrent, const float InterpTime = 0.0f, const float InterpSpeed = 15.0f);
 
 	UFUNCTION(BlueprintCallable)
-		virtual void EquipWeapon(TSubclassOf<AWeapon_Base_Ranged> WeaponClass);
+		virtual void EquipWeapon(TSubclassOf<AWeapon_Base_Ranged> WeaponClass, AActor* PickUpActor = nullptr);
 
 	UFUNCTION(BlueprintCallable, BlueprintPure)
 		FORCEINLINE FCharacterStats GetStats() { return CharacterStats; }
 
 	UPROPERTY(BlueprintAssignable)
 		FOnHealthChangedDelegate OnHealthChanged;
+
+	UPROPERTY(BlueprintAssignable)
+		FOnWeaponChangedDelegate OnWeaponChanged;
 
 	virtual void CheckHit_Implementation(FVector HitLocation, AActor* HitActor, FVector CollisionSize) override;
 
@@ -98,13 +113,21 @@ protected:
 
 	void Reload();
 
+	void BeginAim();
+
+	void EndAim();
+
+	void OpenScoreboard();
+
+	void CloseScoreboard();
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Turn in place", meta = (AllowPrivateAccess = "true"), DisplayName = "Aim offset acceleration angle threshold")
 		float AimOffsetAccelerationAngleThreshold = 10.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Turn in place", meta = (AllowPrivateAccess = "true"), DisplayName = "Aim offset acceleration multiplier")
 		FVector2D AimOffsetAccelerationMultiplier = FVector2D(1.0f, 2.0f);
 
-	UPROPERTY(Replicated, BlueprintReadWrite, meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(Replicated, BlueprintReadWrite, ReplicatedUsing = WeaponChanged, meta = (AllowPrivateAccess = "true"))
 		TObjectPtr<class AWeapon_Base_Ranged> WeaponRef;
 
 	UPROPERTY(Replicated, BlueprintReadWrite, meta = (AllowPrivateAccess = "true"), Category = "Aim Offset", DisplayName = "Aim Offset Pitch")
@@ -119,10 +142,11 @@ protected:
 	UPROPERTY(Replicated, EditAnywhere, BlueprintReadWrite, ReplicatedUsing = RecalculateHealth, meta = (AllowPrivateAccess = "true"), DisplayName = "Character stats")
 		FCharacterStats CharacterStats;
 
+	//Net functions
 	UFUNCTION(Server, Reliable, BlueprintCallable)
-		void ServerEquipWeapon(TSubclassOf<AWeapon_Base_Ranged> WeaponClass);
+		void ServerEquipWeapon(TSubclassOf<AWeapon_Base_Ranged> WeaponClass, AActor* PickUpActor = nullptr);
 
-	virtual void ServerEquipWeapon_Implementation(TSubclassOf<AWeapon_Base_Ranged> WeaponClass);
+	virtual void ServerEquipWeapon_Implementation(TSubclassOf<AWeapon_Base_Ranged> WeaponClass, AActor* PickUpActor = nullptr);
 
 	UFUNCTION(Server, Reliable, BlueprintCallable)
 		void ServerSetAimOffset(float Offset_Y, float Offset_Z);
@@ -144,8 +168,18 @@ protected:
 
 	virtual void MulticastReload_Implementation();
 
+	UFUNCTION(Server, Reliable, BlueprintCallable)
+		void ServerSetAim(bool Aiming);
+
+	virtual void ServerSetAim_Implementation(bool Aiming);
+
+	UFUNCTION(NetMulticast, Reliable, BlueprintCallable)
+		void MulticastSetAim(bool Aiming);
+
+	virtual void MulticastSetAim_Implementation(bool Aiming);
+
 	UFUNCTION(BlueprintCallable)
-		void ApplyDamage(float Damage);
+		void ApplyDamage(float Damage, ACharacter* DamageOwner);
 
 protected:
 	// APawn interface
@@ -168,11 +202,20 @@ public:
 	UFUNCTION(BlueprintCallable)
 		float GetAimOffset_Z() const;
 
+	UPROPERTY(Replicated, EditAnywhere, BlueprintReadWrite, DisplayName = "Aiming")
+		bool bAiming;
+
 private:
 
 	FRotator AimOffsetRotator;
 
 	FTimerHandle ReloadTimer;
+
+	TObjectPtr<class ATestMPTPSGameState> GameState;
+
+	TObjectPtr<class ATestMPTPSPlayerController> PlayerController;
+
+	TObjectPtr<class ATestMPTPSHUD> GameHUD;
 
 	void GetLifetimeReplicatedProps(TArray< FLifetimeProperty >& OutLifetimeProps) const override;
 
@@ -180,7 +223,12 @@ private:
 		void RecalculateHealth();
 
 	UFUNCTION()
+		void WeaponChanged();
+
+	UFUNCTION()
 		void PlayReloadAnimation();
+
+	bool bDead = false;
 
 };
 

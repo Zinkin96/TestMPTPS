@@ -36,6 +36,8 @@ private:
 
 public:
 
+	virtual void BeginPlay() override;
+
 	ATestMPTPSPlayerController();
 
 	virtual FVector TargetResult_Location_Implementation() override;
@@ -46,4 +48,9 @@ public:
 		void ServerCallRespawnCountdown();
 
 	virtual void ServerCallRespawnCountdown_Implementation();
+
+	UFUNCTION(Client, Reliable, BlueprintCallable)
+		void ClientRoundEnd();
+
+	virtual void ClientRoundEnd_Implementation();
 };

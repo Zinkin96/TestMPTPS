@@ -14,4 +14,8 @@ class TESTMPTPS_API UMainUI_Base : public UUserWidget
 {
 	GENERATED_BODY()
 	
+public:
+
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+		void ShowScoreboard(bool bShow);
 };

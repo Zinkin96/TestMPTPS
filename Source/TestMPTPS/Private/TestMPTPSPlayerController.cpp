@@ -4,11 +4,18 @@
 #include "TestMPTPSPlayerController.h"
 #include "TestMPTPSCharacter.h"
 #include "TestMPTPSGameMode.h"
+#include "TestMPTPSHUD.h"
+#include "GameFramework/PawnMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
 
 ATestMPTPSPlayerController::ATestMPTPSPlayerController()
 {
 	GameMode = Cast<ATestMPTPSGameMode>(UGameplayStatics::GetGameMode(GetWorld()));
+}
+
+void ATestMPTPSPlayerController::BeginPlay()
+{
+	Super::BeginPlay();
 }
 
 void ATestMPTPSPlayerController::Tick(float DeltaSeconds)
@@ -64,6 +71,19 @@ void ATestMPTPSPlayerController::ServerCallRespawnCountdown_Implementation()
 	}
 	FTimerHandle RespawnTimer;
 	GetWorldTimerManager().SetTimer(RespawnTimer, this, &ATestMPTPSPlayerController::CallRespawn, GameMode->GetRespawnTime(), false);
+}
+
+void ATestMPTPSPlayerController::ClientRoundEnd_Implementation()
+{
+	if (GetPawn())
+	{
+		GetPawn()->GetMovementComponent()->StopMovementImmediately();
+	}
+	UnPossess();
+	if (TObjectPtr<ATestMPTPSHUD> GameHUD = Cast<ATestMPTPSHUD>(GetHUD()))
+	{
+		GameHUD->GetMainWidget()->ShowScoreboard(true);
+	}
 }
 
 void ATestMPTPSPlayerController::CallRespawn()

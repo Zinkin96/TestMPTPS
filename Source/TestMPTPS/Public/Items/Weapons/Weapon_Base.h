@@ -19,9 +19,6 @@ public:
 	UPROPERTY(Editanywhere, BlueprintReadWrite, Category = "Damage", DisplayName = "Damage")
 		float Damage = 1.0f;
 
-	UPROPERTY(Editanywhere, BlueprintReadWrite, Category = "Damage", DisplayName = "Projectile count")
-		int32 ProjectileCount = 1;
-
 	UPROPERTY(Editanywhere, BlueprintReadWrite, Category = "Attack speed", DisplayName = "Attack rate")
 		float AttackRate = 1.0f;
 

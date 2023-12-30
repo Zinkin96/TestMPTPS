@@ -3,11 +3,11 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "GameFramework/GameModeBase.h"
+#include "GameFramework/GameMode.h"
 #include "TestMPTPSGameMode.generated.h"
 
 UCLASS(minimalapi)
-class ATestMPTPSGameMode : public AGameModeBase
+class ATestMPTPSGameMode : public AGameMode
 {
 	GENERATED_BODY()
 
@@ -19,6 +19,9 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 		void Respawn(APlayerController* PlayerController);
+
+	UFUNCTION(BlueprintCallable)
+		void Despawn(APlayerController* PlayerController);
 
 private:
 

@@ -17,8 +17,10 @@ public:
 	// Sets default values for this actor's properties
 	APickUp();
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Meta = (ExposeOnSpawn = true), DisplayName = "Item")
-		UItemData* Item;
+	~APickUp();
+
+	UPROPERTY(Replicated, EditAnywhere, BlueprintReadWrite, Meta = (ExposeOnSpawn = true), DisplayName = "Item")
+		TObjectPtr<UItemData> Item;
 
 	virtual void InteractionEvent_Implementation(AActor* InteractionCaller) override;
 
@@ -35,6 +37,9 @@ private:
 	UStaticMeshComponent* ItemMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("RootMesh"));
 
 	void ConstructPickupMesh();
+
+
+	void GetLifetimeReplicatedProps(TArray< FLifetimeProperty >& OutLifetimeProps) const override;
 
 #if WITH_EDITOR
 	void OnConstruction(const FTransform& Transform) override;

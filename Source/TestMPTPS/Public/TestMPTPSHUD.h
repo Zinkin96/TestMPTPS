@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/HUD.h"
+#include "UI/MainUI_Base.h"
 #include "TestMPTPSHUD.generated.h"
 
 /**
@@ -19,9 +20,12 @@ public:
 
 	virtual void BeginPlay() override;
 
+	UFUNCTION(BlueprintCallable)
+		FORCEINLINE UMainUI_Base* GetMainWidget() { return MainWidgetUI; }
+
 private:
 
-	TObjectPtr<UUserWidget> MainWidgetUI;
+	TObjectPtr<UMainUI_Base> MainWidgetUI;
 
 	TSubclassOf<UUserWidget> MainWidgetUIClass;
 };

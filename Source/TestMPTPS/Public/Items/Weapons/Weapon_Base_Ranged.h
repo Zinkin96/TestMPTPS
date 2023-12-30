@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Delegates/Delegate.h"
 #include "Items/Weapons/Weapon_Base.h"
 #include "Particles/ParticleSystem.h"
 #include "Weapon_Base_Ranged.generated.h"
@@ -10,6 +11,9 @@
 /**
  *
  */
+UDELEGATE()
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnAmmoCountChangedDelegate);
+
 class UAnimMontage;
 
 USTRUCT(BlueprintType, Blueprintable)
@@ -25,6 +29,9 @@ public:
 	UPROPERTY(Editanywhere, BlueprintReadWrite, Category = "Ammo", DisplayName = "Current ammo")
 		int32 CurrentAmmo = MaxAmmo;
 
+	UPROPERTY(Editanywhere, BlueprintReadWrite, Category = "Ammo", DisplayName = "Projectile num")
+		int32 ProjectileNum = 1;
+
 	UPROPERTY(Editanywhere, BlueprintReadWrite, Category = "Ammo", DisplayName = "Reload speed")
 		float ReloadSpeed = 2.0f;
 };
@@ -36,6 +43,8 @@ class TESTMPTPS_API AWeapon_Base_Ranged : public AWeapon_Base
 
 public:
 
+	~AWeapon_Base_Ranged();
+
 	void BeginAttack() override;
 
 	void EndAttack() override;
@@ -45,6 +54,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, BlueprintPure)
 		FORCEINLINE UAnimMontage* GetReloadMontage() { return ReloadMontageAsset; }
+
+	UPROPERTY(BlueprintAssignable)
+		FOnAmmoCountChangedDelegate OnAmmoCountChanged;
 
 	UFUNCTION()
 		void RefillMagazine();
@@ -68,19 +80,19 @@ protected:
 		TObjectPtr<UAnimMontage> ReloadMontageAsset;
 
 	UFUNCTION(Server, Reliable, BlueprintCallable)
-		void ServerWeaponAttack(FVector Location, FRotator Rotation);
+		void ServerWeaponAttack(FVector Location, const TArray<FRotator>& Rotations);
 
-	virtual void ServerWeaponAttack_Implementation(FVector Location, FRotator Rotation);
+	virtual void ServerWeaponAttack_Implementation(FVector Location, const TArray<FRotator>& Rotations);
 
 	UFUNCTION(NetMulticast, Reliable, BlueprintCallable)
-		void MulticastWeaponAttack(FVector Location, FRotator Rotation);
+		void MulticastWeaponAttack(FVector Location, const TArray<FRotator>& Rotations);
 
-	virtual void MulticastWeaponAttack_Implementation(FVector Location, FRotator Rotation);
+	virtual void MulticastWeaponAttack_Implementation(FVector Location, const TArray<FRotator>& Rotations);
 
 private:
 
 	virtual void BeginPlay() override;
 
 	UFUNCTION()
-		void SpawnProjectile(FVector Location, FRotator Rotation);
+		void SpawnProjectile(FVector Location, const TArray<FRotator>& Rotations);
 };

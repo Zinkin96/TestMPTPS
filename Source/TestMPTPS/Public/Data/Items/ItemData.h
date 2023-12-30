@@ -7,7 +7,7 @@
 #include "Items/Item_Base.h"
 #include "ItemData.generated.h"
 
-UCLASS()
+UCLASS(Blueprintable)
 class TESTMPTPS_API UItemData : public UDataAsset
 {
 	GENERATED_BODY()

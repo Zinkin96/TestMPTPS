@@ -7,6 +7,7 @@
 #include "TestMPTPSHUD.h"
 #include "GameFramework/PawnMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "Kismet/KismetMathLibrary.h"
 
 ATestMPTPSPlayerController::ATestMPTPSPlayerController()
 {
@@ -41,7 +42,7 @@ void ATestMPTPSPlayerController::Tick(float DeltaSeconds)
 	}
 	else
 	{
-		TargetLocation = EndPoint;
+		TargetLocation = HitResultTarget.TraceEnd;
 	}
 }
 

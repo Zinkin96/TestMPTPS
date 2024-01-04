@@ -45,14 +45,16 @@ void AWeapon_Base_Ranged::AttackHandle_Implementation()
 			FVector StartLocation = WeaponMesh->GetSocketLocation("MuzzleFlash");
 
 			TArray<FRotator> ResultRotations;
+			FRotator LookAtTargetRotatoin = UKismetMathLibrary::FindLookAtRotation(StartLocation, IInteractable::Execute_TargetResult_Location(GetOwner()));
+			LookAtTargetRotatoin.Roll = 0.0f;
 			for (int32 ProjectileIndex = 0; ProjectileIndex < WeaponAmmoStats.ProjectileNum; ProjectileIndex++)
 			{
-				FRotator ResultRotation = UKismetMathLibrary::FindLookAtRotation(StartLocation, IInteractable::Execute_TargetResult_Location(GetOwner())) + FRotator(UKismetMathLibrary::RandomFloatInRange(WeaponStats.AttackSpread / 2 * -1, WeaponStats.AttackSpread / 2), UKismetMathLibrary::RandomFloatInRange(WeaponStats.AttackSpread / 2 * -1, WeaponStats.AttackSpread / 2), 0);
-				ResultRotations.Add(ResultRotation);
+				FVector ConeSpreadLocation = UKismetMathLibrary::RandomUnitVectorInConeInDegrees(UKismetMathLibrary::GetForwardVector(LookAtTargetRotatoin), WeaponStats.AttackSpread);
+				ResultRotations.Add(ConeSpreadLocation.Rotation());
 			}
 			UGameplayStatics::SpawnEmitterAttached(MuzzleParticle, RootComponent, "MuzzleFlash");
 
-			WeaponAmmoStats.CurrentAmmo = FMath::Max(0, WeaponAmmoStats.CurrentAmmo-1);
+			WeaponAmmoStats.CurrentAmmo = FMath::Max(0, WeaponAmmoStats.CurrentAmmo - 1);
 			OnAmmoCountChanged.Broadcast();
 			SpawnProjectile(StartLocation, ResultRotations);
 			ServerWeaponAttack(StartLocation, ResultRotations);
@@ -72,7 +74,7 @@ bool AWeapon_Base_Ranged::IsAttackPossible()
 	return true;
 }
 
-void AWeapon_Base_Ranged::ServerWeaponAttack_Implementation(FVector Location, const TArray<FRotator> &Rotations)
+void AWeapon_Base_Ranged::ServerWeaponAttack_Implementation(FVector Location, const TArray<FRotator>& Rotations)
 {
 	MulticastWeaponAttack(Location, Rotations);
 }

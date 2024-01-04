@@ -282,7 +282,11 @@ void ATestMPTPSCharacter::Look(const FInputActionValue& Value)
 void ATestMPTPSCharacter::Interact(const FInputActionValue& Value)
 {
 	TObjectPtr<AActor> InteractableActor = IInteractable::Execute_TargetResult_Actor(GetController());
-	if (IsValid(InteractableActor) && Cast<IInteractable>(InteractableActor))
+	if (!IsValid(InteractableActor) || !Cast<IInteractable>(InteractableActor))
+	{
+		return;
+	}
+	if (UKismetMathLibrary::Vector_Distance(GetActorLocation(), InteractableActor->GetActorLocation()) <= InteractionRange)
 	{
 		IInteractable::Execute_InteractionEvent(InteractableActor, this);
 	}

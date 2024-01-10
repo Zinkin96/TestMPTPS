@@ -130,9 +130,6 @@ protected:
 	UPROPERTY(Replicated, BlueprintReadWrite, ReplicatedUsing = WeaponChanged, meta = (AllowPrivateAccess = "true"))
 		TObjectPtr<class AWeapon_Base_Ranged> WeaponRef;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (AllowPrivateAccess = "true"))
-		float InteractionRange = 250.0f;
-
 	UPROPERTY(Replicated, BlueprintReadWrite, meta = (AllowPrivateAccess = "true"), Category = "Aim Offset", DisplayName = "Aim Offset Pitch")
 		float AimOffset_Y = 0.0f;
 

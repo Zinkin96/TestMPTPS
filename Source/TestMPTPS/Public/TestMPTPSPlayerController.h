@@ -5,11 +5,12 @@
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
 #include "Interfaces/Interactable.h"
+#include "Delegates/Delegate.h"
 #include "TestMPTPSPlayerController.generated.h"
 
-/**
- *
- */
+UDELEGATE()
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnTargetedActorChangedDelegate, AActor*, TargetActor);
+
 UCLASS()
 class TESTMPTPS_API ATestMPTPSPlayerController : public APlayerController, public IInteractable
 {
@@ -29,6 +30,8 @@ private:
 
 	FVector TargetLocation;
 
+	TObjectPtr<AActor> TargetActor;
+
 	TObjectPtr<class ATestMPTPSGameMode> GameMode;
 
 	UFUNCTION(BlueprintCallable)
@@ -40,9 +43,12 @@ public:
 
 	ATestMPTPSPlayerController();
 
-	virtual FVector TargetResult_Location_Implementation() override;
+	UPROPERTY(BlueprintAssignable)
+		FOnTargetedActorChangedDelegate OnTargetedActorChanged;
 
-	virtual AActor* TargetResult_Actor_Implementation() override;
+	virtual FVector TargetResult_Location_Implementation() override { return TargetLocation; }
+
+	virtual AActor* TargetResult_Actor_Implementation() override { return TargetActor; }
 
 	UFUNCTION(Server, Reliable, BlueprintCallable)
 		void ServerCallRespawnCountdown();
@@ -53,4 +59,9 @@ public:
 		void ClientRoundEnd();
 
 	virtual void ClientRoundEnd_Implementation();
+
+protected:
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (AllowPrivateAccess = "true"))
+		float InteractionRange = 250.0f;
 };

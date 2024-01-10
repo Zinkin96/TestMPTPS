@@ -36,6 +36,8 @@ void ATestMPTPSPlayerController::Tick(float DeltaSeconds)
 	//	DrawDebugLine(GetWorld(), StartPoint, EndPoint, FColor::Emerald, false, -1.0f);
 	//}
 	/**/
+
+	//Set target location
 	if (HitResultTarget.bBlockingHit)
 	{
 		TargetLocation = HitResultTarget.Location;
@@ -44,6 +46,20 @@ void ATestMPTPSPlayerController::Tick(float DeltaSeconds)
 	{
 		TargetLocation = HitResultTarget.TraceEnd;
 	}
+
+	//Set target actor
+	if (IsValid(HitResultTarget.GetActor()) && IsValid(GetPawn()))
+	{
+		if (UKismetMathLibrary::Vector_Distance(GetPawn()->GetActorLocation(), HitResultTarget.GetActor()->GetActorLocation()) <= InteractionRange)
+		{
+			TargetActor = HitResultTarget.GetActor();
+		}
+		else
+		{
+			TargetActor = nullptr;
+		}
+	}
+	OnTargetedActorChanged.Broadcast(TargetActor.Get());
 }
 
 void ATestMPTPSPlayerController::OnPossess(APawn* InPawn)
@@ -52,16 +68,6 @@ void ATestMPTPSPlayerController::OnPossess(APawn* InPawn)
 	CollisionQueryParamsTarget.ClearIgnoredActors();
 	CollisionQueryParamsTarget.AddIgnoredActor(GetPawn());
 	ControlledCharacterBase = Cast<ATestMPTPSCharacter>(GetPawn());
-}
-
-FVector ATestMPTPSPlayerController::TargetResult_Location_Implementation()
-{
-	return TargetLocation;
-}
-
-AActor* ATestMPTPSPlayerController::TargetResult_Actor_Implementation()
-{
-	return HitResultTarget.GetActor();
 }
 
 void ATestMPTPSPlayerController::ServerCallRespawnCountdown_Implementation()

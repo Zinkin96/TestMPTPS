@@ -286,10 +286,7 @@ void ATestMPTPSCharacter::Interact(const FInputActionValue& Value)
 	{
 		return;
 	}
-	if (UKismetMathLibrary::Vector_Distance(GetActorLocation(), InteractableActor->GetActorLocation()) <= InteractionRange)
-	{
-		IInteractable::Execute_InteractionEvent(InteractableActor, this);
-	}
+	IInteractable::Execute_InteractionEvent(InteractableActor, this);
 }
 
 void ATestMPTPSCharacter::BeginAttack()

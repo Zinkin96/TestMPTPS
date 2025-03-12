@@ -5,6 +5,7 @@
 #include "TestMPTPSCharacter.h"
 #include "Items/Weapons/Weapon_Base_Ranged.h"
 #include <Net/UnrealNetwork.h>
+#include "Items/PickUp.h"
 
 
 // Sets default values
@@ -25,11 +26,6 @@ APickUp::APickUp()
 	ItemMesh->BodyInstance.SetResponseToAllChannels(ECollisionResponse::ECR_Block);
 }
 
-APickUp::~APickUp()
-{
-	OnDestroyed.RemoveAll(this);
-}
-
 void APickUp::GetLifetimeReplicatedProps(TArray< FLifetimeProperty >& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
@@ -41,6 +37,13 @@ void APickUp::BeginPlay()
 {
 	Super::BeginPlay();
 	ConstructPickupMesh();
+}
+
+void APickUp::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	OnDestroyed.RemoveAll(this);
+
+	Super::EndPlay(EndPlayReason);
 }
 
 // Called every frame
